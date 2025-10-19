@@ -41,6 +41,8 @@ export function LendingApp() {
   const [poolMetrics, setPoolMetrics] = useState({ totalDeposits: '0', totalBorrows: '0', poolBalance: '0' });
   const [isDecryptingBalances, setIsDecryptingBalances] = useState(false);
   const [isDecryptingPool, setIsDecryptingPool] = useState(false);
+  const [hasDecryptedBalances, setHasDecryptedBalances] = useState(false);
+  const [hasDecryptedPool, setHasDecryptedPool] = useState(false);
   const [operatorGranted, setOperatorGranted] = useState(false);
 
   const poolConfigured = isValidAddress(LENDING_POOL_ADDRESS);
@@ -131,69 +133,16 @@ export function LendingApp() {
   }
 
   useEffect(() => {
-    let cancelled = false;
-
-    if (!accountData || !instance || !address) {
-      setBalances({ deposit: '0', debt: '0' });
-      return;
-    }
-
-    (async () => {
-      try {
-        setIsDecryptingBalances(true);
-        const decrypted = await decryptHandles(accountData as readonly unknown[]);
-        if (!decrypted || cancelled) return;
-
-        const depositHandle = accountData?.[0] as string;
-        const debtHandle = accountData?.[1] as string;
-
-        setBalances({
-          deposit: decrypted[depositHandle] ?? '0',
-          debt: decrypted[debtHandle] ?? '0',
-        });
-      } catch (err) {
-        console.error('Failed to decrypt balances', err);
-      } finally {
-        if (!cancelled) setIsDecryptingBalances(false);
-      }
-    })();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [accountData, instance, address]);
+    setIsDecryptingBalances(false);
+    setHasDecryptedBalances(false);
+    setBalances({ deposit: '0', debt: '0' });
+  }, [accountData, address]);
 
   useEffect(() => {
-    let cancelled = false;
-
-    if (!totalsData || !instance) {
-      setPoolMetrics({ totalDeposits: '0', totalBorrows: '0', poolBalance: '0' });
-      return;
-    }
-
-    (async () => {
-      try {
-        setIsDecryptingPool(true);
-        const decrypted = await decryptHandles(totalsData as readonly unknown[]);
-        if (!decrypted || cancelled) return;
-
-        const totalsArray = totalsData as readonly string[];
-        setPoolMetrics({
-          totalDeposits: decrypted[totalsArray[0]] ?? '0',
-          totalBorrows: decrypted[totalsArray[1]] ?? '0',
-          poolBalance: decrypted[totalsArray[2]] ?? '0',
-        });
-      } catch (err) {
-        console.error('Failed to decrypt pool totals', err);
-      } finally {
-        if (!cancelled) setIsDecryptingPool(false);
-      }
-    })();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [totalsData, instance]);
+    setIsDecryptingPool(false);
+    setHasDecryptedPool(false);
+    setPoolMetrics({ totalDeposits: '0', totalBorrows: '0', poolBalance: '0' });
+  }, [totalsData]);
 
   async function handleAction(
     label: string,
@@ -264,6 +213,83 @@ export function LendingApp() {
     return builder.add64(amount).encrypt();
   }
 
+  async function handleDecryptBalances() {
+    setError('');
+    setFeedback('');
+
+    if (!address) {
+      setError('Connect your wallet to decrypt balances.');
+      return;
+    }
+
+    if (!accountData) {
+      setError('Balances are not available yet.');
+      return;
+    }
+
+    try {
+      setIsDecryptingBalances(true);
+      const decrypted = await decryptHandles(accountData as readonly unknown[]);
+      if (!decrypted) {
+        throw new Error('Decryption service did not return balances.');
+      }
+
+      const depositHandle = accountData?.[0] as string | undefined;
+      const debtHandle = accountData?.[1] as string | undefined;
+
+      setBalances({
+        deposit: depositHandle ? decrypted[depositHandle] ?? '0' : '0',
+        debt: debtHandle ? decrypted[debtHandle] ?? '0' : '0',
+      });
+      setHasDecryptedBalances(true);
+      setFeedback('Balances decrypted successfully.');
+    } catch (err) {
+      console.error('Balances decrypt failed', err);
+      const message = err instanceof Error ? err.message : 'Unknown error';
+      setError(`Decrypt balances failed: ${message}`);
+    } finally {
+      setIsDecryptingBalances(false);
+    }
+  }
+
+  async function handleDecryptPoolMetrics() {
+    setError('');
+    setFeedback('');
+
+    if (!address) {
+      setError('Connect your wallet to decrypt pool metrics.');
+      return;
+    }
+
+    if (!totalsData) {
+      setError('Pool metrics are not available yet.');
+      return;
+    }
+
+    try {
+      setIsDecryptingPool(true);
+      const decrypted = await decryptHandles(totalsData as readonly unknown[]);
+      if (!decrypted) {
+        throw new Error('Decryption service did not return pool metrics.');
+      }
+
+      const totalsArray = totalsData as readonly string[];
+      setPoolMetrics({
+        totalDeposits: totalsArray[0] ? decrypted[totalsArray[0]] ?? '0' : '0',
+        totalBorrows: totalsArray[1] ? decrypted[totalsArray[1]] ?? '0' : '0',
+        poolBalance: totalsArray[2] ? decrypted[totalsArray[2]] ?? '0' : '0',
+      });
+      setHasDecryptedPool(true);
+      setFeedback('Pool metrics decrypted successfully.');
+    } catch (err) {
+      console.error('Pool metrics decrypt failed', err);
+      const message = err instanceof Error ? err.message : 'Unknown error';
+      setError(`Decrypt pool metrics failed: ${message}`);
+    } finally {
+      setIsDecryptingPool(false);
+    }
+  }
+
   const isBusy = Boolean(pendingAction) || zamaLoading;
 
   return (
@@ -278,18 +304,54 @@ export function LendingApp() {
               Deposit fheUSDT, earn a confidential balance, and borrow privately without revealing amounts on-chain.
             </p>
           </div>
+          <div className="overview-actions">
+            <button
+              type="button"
+              className="decrypt-button"
+              onClick={handleDecryptBalances}
+              disabled={isDecryptingBalances || isBusy || !accountData || !poolConfigured}
+            >
+              {isDecryptingBalances ? 'Decrypting balances…' : hasDecryptedBalances ? 'Balances decrypted' : 'Decrypt my balances'}
+            </button>
+            <button
+              type="button"
+              className="decrypt-button"
+              onClick={handleDecryptPoolMetrics}
+              disabled={isDecryptingPool || isBusy || !totalsData || !poolConfigured}
+            >
+              {isDecryptingPool ? 'Decrypting pool…' : hasDecryptedPool ? 'Pool decrypted' : 'Decrypt pool metrics'}
+            </button>
+          </div>
           <div className="status-cards">
             <div className="status-card">
               <span className="label">My Deposit</span>
-              <span className="value">{isDecryptingBalances ? 'Decrypting…' : `${balances.deposit} fheUSDT`}</span>
+              <span className="value">
+                {isDecryptingBalances
+                  ? 'Decrypting…'
+                  : hasDecryptedBalances
+                  ? `${balances.deposit} fheUSDT`
+                  : 'Encrypted'}
+              </span>
             </div>
             <div className="status-card">
               <span className="label">My Debt</span>
-              <span className="value">{isDecryptingBalances ? 'Decrypting…' : `${balances.debt} fheUSDT`}</span>
+              <span className="value">
+                {isDecryptingBalances
+                  ? 'Decrypting…'
+                  : hasDecryptedBalances
+                  ? `${balances.debt} fheUSDT`
+                  : 'Encrypted'}
+              </span>
             </div>
             <div className="status-card">
               <span className="label">Pool Liquidity</span>
-              <span className="value">{isDecryptingPool ? 'Decrypting…' : `${poolMetrics.poolBalance} fheUSDT`}</span>
+              <span className="value">
+                {isDecryptingPool
+                  ? 'Decrypting…'
+                  : hasDecryptedPool
+                  ? `${poolMetrics.poolBalance} fheUSDT`
+                  : 'Encrypted'}
+              </span>
             </div>
           </div>
         </section>
@@ -440,18 +502,34 @@ export function LendingApp() {
             <ul>
               <li>
                 <span>Total Deposits</span>
-                <strong>{isDecryptingPool ? 'Decrypting…' : `${poolMetrics.totalDeposits} fheUSDT`}</strong>
+                <strong>
+                  {isDecryptingPool
+                    ? 'Decrypting…'
+                    : hasDecryptedPool
+                    ? `${poolMetrics.totalDeposits} fheUSDT`
+                    : 'Encrypted'}
+                </strong>
               </li>
               <li>
                 <span>Total Borrows</span>
-                <strong>{isDecryptingPool ? 'Decrypting…' : `${poolMetrics.totalBorrows} fheUSDT`}</strong>
+                <strong>
+                  {isDecryptingPool
+                    ? 'Decrypting…'
+                    : hasDecryptedPool
+                    ? `${poolMetrics.totalBorrows} fheUSDT`
+                    : 'Encrypted'}
+                </strong>
               </li>
               <li>
                 <span>Utilization</span>
                 <strong>
-                  {Number(poolMetrics.totalDeposits) > 0
+                  {isDecryptingPool
+                    ? 'Decrypting…'
+                    : hasDecryptedPool && Number(poolMetrics.totalDeposits) > 0
                     ? `${((Number(poolMetrics.totalBorrows) / Number(poolMetrics.totalDeposits)) * 100).toFixed(1)}%`
-                    : '0%'}
+                    : hasDecryptedPool
+                    ? '0%'
+                    : 'Encrypted'}
                 </strong>
               </li>
             </ul>

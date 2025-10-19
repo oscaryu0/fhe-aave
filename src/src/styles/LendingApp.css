@@ -20,6 +20,37 @@
   gap: 1.5rem;
 }
 
+.overview-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.decrypt-button {
+  background: linear-gradient(135deg, #38bdf8, #6366f1);
+  border: none;
+  border-radius: 0.75rem;
+  padding: 0.65rem 1.1rem;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #0b1120;
+  cursor: pointer;
+  transition: transform 0.15s ease, box-shadow 0.15s ease, opacity 0.15s ease;
+}
+
+.decrypt-button:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 18px 45px -22px rgba(59, 130, 246, 0.8);
+}
+
+.decrypt-button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
 .overview-text h2 {
   font-size: 2rem;
   font-weight: 700;
