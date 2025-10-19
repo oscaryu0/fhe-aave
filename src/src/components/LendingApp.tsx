@@ -17,6 +17,46 @@ type HandleMap = Record<string, string>;
 
 const SECONDS_IN_DAY = 24 * 60 * 60;
 const ZERO_ADDRESS = '0x0000000000000000000000000000000000000000';
+const HEX_STRING_REGEX = /^0x[0-9a-f]+$/i;
+const ZERO_HEX_REGEX = /^0x0+$/i;
+const ZERO_DECIMAL_REGEX = /^0+$/;
+
+function formatDecryptedValue(raw: unknown): string {
+  if (typeof raw === 'bigint') {
+    return raw === BigInt(0) ? '0' : raw.toString();
+  }
+
+  if (typeof raw === 'number') {
+    if (!Number.isFinite(raw)) return '0';
+    return raw === 0 ? '0' : raw.toString();
+  }
+
+  if (typeof raw === 'boolean') {
+    return raw ? '1' : '0';
+  }
+
+  if (typeof raw === 'string') {
+    const trimmed = raw.trim();
+    if (!trimmed) return '0';
+    if (ZERO_HEX_REGEX.test(trimmed) || ZERO_DECIMAL_REGEX.test(trimmed)) {
+      return '0';
+    }
+    if (HEX_STRING_REGEX.test(trimmed)) {
+      try {
+        return BigInt(trimmed).toString();
+      } catch {
+        return trimmed;
+      }
+    }
+    return trimmed;
+  }
+
+  if (raw == null) {
+    return '0';
+  }
+
+  return '0';
+}
 
 function isValidAddress(value: string) {
   return /^0x[a-fA-F0-9]{40}$/i.test(value) && value.toLowerCase() !== ZERO_ADDRESS;
@@ -93,6 +133,21 @@ export function LendingApp() {
       return null;
     }
 
+    const zeroValues: HandleMap = {};
+    const handlesToDecrypt: string[] = [];
+
+    for (const handle of filteredHandles) {
+      if (typeof handle === 'string' && ZERO_HEX_REGEX.test(handle.trim())) {
+        zeroValues[handle] = '0';
+      } else {
+        handlesToDecrypt.push(handle);
+      }
+    }
+
+    if (!handlesToDecrypt.length) {
+      return Object.keys(zeroValues).length ? zeroValues : null;
+    }
+
     const signer = await signerPromise;
     if (!signer) {
       return null;
@@ -113,7 +168,7 @@ export function LendingApp() {
       eip712.message,
     );
 
-    const handleContractPairs = filteredHandles.map((handle) => ({
+    const handleContractPairs = handlesToDecrypt.map((handle) => ({
       handle,
       contractAddress: LENDING_POOL_ADDRESS,
     }));
@@ -129,7 +184,13 @@ export function LendingApp() {
       durationDays,
     );
 
-    return result as HandleMap;
+    const mapped: HandleMap = { ...zeroValues };
+    const resultMap = result as Record<string, unknown>;
+    for (const pair of handleContractPairs) {
+      mapped[pair.handle] = formatDecryptedValue(resultMap[pair.handle]);
+    }
+
+    return mapped;
   }
 
   useEffect(() => {
