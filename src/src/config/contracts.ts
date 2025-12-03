@@ -1,4 +1,4 @@
-export const LENDING_POOL_ADDRESS = '0xcc9bb76E71764292a2bcdDd24B174E535B44597C';
+export const LENDING_POOL_ADDRESS = '0x2bfA93384a3B9B3F3C5DB27c7090331c724e2F84';
 export const LENDING_POOL_ABI = [
   {
     "inputs": [
@@ -272,7 +272,7 @@ export const LENDING_POOL_ABI = [
   }
 ] as const;
 
-export const FHE_USDT_ADDRESS = '0x3fDa6F57Ef5B3a5DBe02BEB043eE45324394e328';
+export const FHE_USDT_ADDRESS = '0xDE82a9a5F64b1497ECdA9f2bc95B867FCc9fDafA';
 export const FHE_USDT_ABI = [
   {
     "inputs": [],

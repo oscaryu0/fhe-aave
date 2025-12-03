@@ -1,14 +1,14 @@
 // SPDX-License-Identifier: BSD-3-Clause-Clear
 pragma solidity ^0.8.27;
 
-import {SepoliaConfig} from "@fhevm/solidity/config/ZamaConfig.sol";
+import {ZamaEthereumConfig} from "@fhevm/solidity/config/ZamaConfig.sol";
 import {FHE, ebool, euint64, externalEuint64} from "@fhevm/solidity/lib/FHE.sol";
-import {IERC7984} from "@openzeppelin/confidential-contracts/interfaces/IERC7984.sol";
+import {ERC7984} from "confidential-contracts-v91/contracts/token/ERC7984/ERC7984.sol";
 
 /// @title Confidential lending pool for fheUSDT deposits and loans
 /// @notice Enables encrypted deposits, withdrawals, borrows and repayments using fheUSDT
-contract FHELendingPool is SepoliaConfig {
-    IERC7984 public immutable asset;
+contract FHELendingPool is ZamaEthereumConfig {
+    ERC7984 public immutable asset;
 
     mapping(address account => euint64) private _deposits;
     mapping(address account => euint64) private _debts;
@@ -23,7 +23,7 @@ contract FHELendingPool is SepoliaConfig {
     event Repaid(address indexed account, euint64 amount);
 
     constructor(address assetAddress) {
-        asset = IERC7984(assetAddress);
+        asset = ERC7984(assetAddress);
 
         euint64 zeroAmount = FHE.asEuint64(0);
         _totalDeposits = zeroAmount;
